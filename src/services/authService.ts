@@ -1,0 +1,475 @@
+//Este archivo contiene funciones para interactuar con la API de autenticación
+type ApiError = {
+    message?: string;
+    [key: string]: unknown;
+};
+
+//Es la url base de la API de autenticación
+const AUTH_BASE_URL = `${import.meta.env.VITE_API_URL}/api/auth`;
+
+export function getStoredFirstName(): string {
+    const storedUser = localStorage.getItem("authUser");
+
+    if (!storedUser) {
+        return "";
+    }
+
+    try {
+        const user: unknown = JSON.parse(storedUser);
+
+        if (typeof user !== "object" || user === null) {
+            return "";
+        }
+
+        if ("firstName" in user && typeof user.firstName === "string") {
+            return user.firstName;
+        }
+
+        if ("first_name" in user && typeof user.first_name === "string") {
+            return user.first_name;
+        }
+    } catch (error) {
+        console.error("No se pudo leer el usuario guardado:", error);
+    }
+
+    return "";
+}
+
+export function getStoredEmail(): string {
+    const storedUser = localStorage.getItem("authUser");
+
+    if (!storedUser) {
+        return "";
+    }
+
+    try {
+        const user: unknown = JSON.parse(storedUser);
+
+        if (typeof user !== "object" || user === null) {
+            return "";
+        }
+
+        if ("email" in user && typeof user.email === "string") {
+            return user.email;
+        }
+    } catch (error) {
+        console.error("No se pudo leer el correo guardado:", error);
+    }
+
+    return "";
+}
+
+export function getStoredLastName(): string {
+    const storedUser = localStorage.getItem("authUser");
+
+    if (!storedUser) {
+        return "";
+    }
+
+    try {
+        const user: unknown = JSON.parse(storedUser);
+
+        if (typeof user !== "object" || user === null) {
+            return "";
+        }
+
+        if ("lastName" in user && typeof user.lastName === "string") {
+            return user.lastName;
+        }
+
+        if ("last_name" in user && typeof user.last_name === "string") {
+            return user.last_name;
+        }
+    } catch (error) {
+        console.error("No se pudo leer el apellido guardado:", error);
+    }
+
+    return "";
+}
+
+export function getStoredRoleId(): number | null {
+    const storedUser = localStorage.getItem("authUser");
+
+    if (!storedUser) {
+        return null;
+    }
+
+    try {
+        const user: unknown = JSON.parse(storedUser);
+
+        if (typeof user !== "object" || user === null) {
+            return null;
+        }
+
+        if ("roleId" in user && typeof user.roleId === "number") {
+            return user.roleId;
+        }
+
+        if ("role_id" in user && typeof user.role_id === "number") {
+            return user.role_id;
+        }
+    } catch (error) {
+        console.error("No se pudo leer el rol guardado:", error);
+    }
+
+    return null;
+}
+
+export const logout = () => {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("authUser");
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_user");
+    localStorage.removeItem("scanit_token");
+    localStorage.removeItem("scanit_user");
+    localStorage.removeItem("pendingLoginEmail");
+    localStorage.removeItem("pendingVerificationEmail");
+    localStorage.removeItem("pendingResetEmail");
+    localStorage.removeItem("pendingResetCode");
+    localStorage.removeItem("verificationFlow");
+    sessionStorage.clear();
+};
+
+//Función para registrar un nuevo usuario
+export const register = async (
+    first_name: string,
+    last_name: string,
+    email: string,
+    password: string,
+    code: string,
+    role_id: string | number,
+) => {
+    const response = await fetch(`${AUTH_BASE_URL}/register`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            first_name,
+            last_name,
+            email,
+            password,
+            code,
+            role_id,
+        }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw data as ApiError;
+    }
+
+    return data as {
+        message: string;
+        email?: string;
+    };
+};
+
+//Función para verificar el correo electrónico del usuario
+export const verifyEmail = async (email: string, code: string) => {
+    const response = await fetch(`${AUTH_BASE_URL}/verify-email`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, code }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw data as ApiError;
+    }
+
+    return data as { message: string };
+};
+
+//Función para reenviar el código de verificación al correo electrónico del usuario
+export const resendVerificationCode = async (email: string) => {
+    const response = await fetch(`${AUTH_BASE_URL}/resend-verification-code`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw data as ApiError;
+    }
+
+    return data as { message: string; verificationCode?: string };
+};
+
+// función para iniciar sesión
+export const login = async (email: string, password: string) => {
+    const response = await fetch(`${AUTH_BASE_URL}/login`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw data as ApiError;
+    }
+
+    return data as {
+        message: string;
+        requiresTwoFactor?: boolean;
+        token?: string;
+        user?: Record<string, unknown>;
+    };
+};
+
+//Función para verificar el código de inicio de sesión
+export const verifyLoginCode = async (email: string, code: string) => {
+    const response = await fetch(`${AUTH_BASE_URL}/verify-login-code`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, code }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw data as ApiError;
+    }
+
+    return data as {
+        message: string;
+        token?: string;
+        user?: Record<string, unknown>;
+    };
+};
+
+//Función para reenviar el código el login code al correo electrónico del usuario
+export const resendLoginCode = async (email: string) => {
+    const response = await fetch(`${AUTH_BASE_URL}/resend-login-code`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw data as ApiError;
+    }
+
+    return data as { message: string; verificationCode?: string };
+};
+
+//Función para iniciar recuperación de contraseña
+export const forgotPassword = async (email: string) => {
+    const response = await fetch(`${AUTH_BASE_URL}/forgot-password`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw data as ApiError;
+    }
+
+    return data as { message: string };
+};
+
+export const verifyResetCode = async (
+    email: string,
+    code: string
+) => {
+    const response = await fetch(`${AUTH_BASE_URL}/verify-reset-code`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            email,
+            code,
+        }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(
+            data.message || "No se pudo verificar el código"
+        );
+    }
+
+    return data;
+};
+
+//Función para resetear la contraseña del usuario
+export const resetPassword = async (
+    email: string,
+    code: string,
+    newPassword: string,
+) => {
+    const response = await fetch(`${AUTH_BASE_URL}/reset-password`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, code, newPassword }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw data as ApiError;
+    }
+
+    return data as { message: string };
+};
+
+//Función para reenviar el reset code al correo electrónico del usuario
+export const resendResetCode = async (email: string) => {
+    const response = await fetch(`${AUTH_BASE_URL}/resend-reset-code`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw data as ApiError;
+    }
+
+    return data as { message: string; verificationCode?: string };
+};
+
+
+//editar perfil 
+export const editProfile = async (changes: {
+    first_name?: string,
+    last_name?: string, 
+    email?: string,
+})  => {
+
+    const token = localStorage.getItem("authToken");
+    const response = await fetch(`${AUTH_BASE_URL}/edit-profile`, {
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(changes),
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw data as ApiError;
+    }
+
+   return data as {
+        message: string;
+        user?: {
+            userId: number;
+            firstName: string;
+            lastName: string;
+            email: string;
+            roleId: number;
+        };
+        requiresEmailVerification?: boolean;
+    };
+};
+
+export const changePassword = async (
+  currentPassword: string,
+  newPassword: string,
+  confirmPassword: string,
+) => {
+  const token = localStorage.getItem("authToken");
+
+ const response = await fetch(`${AUTH_BASE_URL}/change-password`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      currentPassword,
+      newPassword,
+      confirmPassword,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw data as { message?: string };
+  }
+
+  return data as { message: string };
+};
+
+
+//Función para verificar el nuevo correo tras un cambio de perfil
+export const verifyProfileEmail = async (code: string) => {
+    const token = localStorage.getItem("authToken");
+    const response = await fetch(`${AUTH_BASE_URL}/verify-profile-email`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ code }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw data as ApiError;
+    }
+
+    return data as { message: string };
+};
+
+//funcion para obtener la informacion del usuario y mostrarla en fornt
+export const getProfile = async () => {
+  const token = localStorage.getItem("authToken");
+
+  const response = await fetch(`${AUTH_BASE_URL}/profile`, {
+    method: "GET",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw data as ApiError;
+  }
+
+  localStorage.setItem("authUser", JSON.stringify(data.user));
+
+  return data as {
+    user: {
+      userId: number;
+      firstName: string;
+      lastName: string;
+      email: string;
+      roleId: number;
+    };
+  };
+};

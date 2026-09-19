@@ -1,0 +1,407 @@
+
+{/* Cambio:ninguno no se toco*/}
+
+
+type ApiError={
+
+
+message?:string;
+[key:string]:unknown;
+};
+
+const MENU_BASE_URL=`${import.meta.env.VITE_API_URL}/api/menu`;
+
+const getImageUrl = (image: string | null) => {
+    if (!image) return image;
+
+    return new URL(image, `${import.meta.env.VITE_API_URL}/`).toString();
+};
+
+export type Product={
+productId:number;
+productName:string;
+description:string|null;
+price:number;
+image:string|null;
+rating:number;
+categoryId:number;
+discount?: number | string;
+discountPercentage?: number | string;
+discount_percent?: number | string;
+isCustom?: boolean | number;
+productType?: string;
+optionGroups?: { id: string; name: string; options: string[] }[];
+options?: unknown[];
+customizations?: unknown[];
+customizationGroups?: unknown[];
+isCustomProduct?: boolean | number;
+};
+
+export type ProductsPage = {
+	products: Product[];
+	hasMore: boolean;
+};
+
+const normalizeProduct = (product: Product): Product => ({
+    ...product,
+    image: getImageUrl(product.image),
+});
+
+
+//obtener lista de productos , filtrado por categoria y busqueda
+
+export const getProducts=async(params?:{
+    category?:number|string;
+    search?:string;
+    limit?:number;
+    offset?:number;
+})=>{
+    const query=new URLSearchParams();
+
+if(params?.category){
+    query.append("category",String(params.category));
+}
+if (params?.search){
+    query.append("search",params.search);
+}
+if (params?.limit){
+    query.append("limit", String(params.limit));  
+}
+if (params?.offset) {
+    query.append("offset", String(params.offset));
+}
+
+const queryString=query.toString();
+const url=queryString
+? `${MENU_BASE_URL}/products?${queryString}`
+:`${MENU_BASE_URL}/products`;
+
+const response =await fetch(url,{
+    method:"GET",
+});
+
+const data=await response.json().catch(()=>({}));
+
+if(!response.ok){
+    throw data as ApiError;
+}
+
+    const page = data as ProductsPage;
+
+    return {
+        ...page,
+        products: page.products.map(normalizeProduct),
+    };
+
+};
+
+
+
+//obtener producto de menu por id
+
+export const getProductById= async (id: number | string)=>{
+    const response =await fetch (`${MENU_BASE_URL}/products/${id}`, {
+        method:"GET",
+    });
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok){
+        throw data as ApiError;
+    }
+    return normalizeProduct(data as Product);
+}
+
+export const isCustomProduct = async (id: number): Promise<boolean> => {
+    const response = await fetch(`${MENU_BASE_URL}/products/custom/${id}`, {
+        method: "GET",
+    });
+
+    if (response.ok) {
+        return true;
+    }
+
+    if (response.status === 404 || response.status === 405) {
+        return false;
+    }
+
+    const data = await response.json().catch(() => ({}));
+    throw data as ApiError;
+};
+
+export const productIsCustom = (product: Product): boolean => {
+    const productData = product as Product & Record<string, unknown>;
+    const type = String(
+        productData.productType ?? productData.type ?? productData.kind ?? "",
+    ).toLowerCase();
+    const searchableText = `${product.productName} ${product.description ?? ""}`
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+
+    return Boolean(
+        productData.isCustom === true ||
+        productData.isCustomProduct === true ||
+        productData.optionGroups ||
+        productData.options ||
+        productData.customizations ||
+        productData.customizationGroups ||
+        type.includes("custom") ||
+        type.includes("personal") ||
+        searchableText.includes("personalizado") ||
+        searchableText.includes("a escoger") ||
+        searchableText.includes("escoger") ||
+        searchableText.includes("opciones"),
+    );
+};
+
+
+//crear producto simple
+export const createProduct = async ({
+    name,
+    description,
+    price,
+    discount,
+    categoryId,
+    image,
+}: {
+    name: string;
+    description: string;
+    price: string;
+    discount: number | "";
+    categoryId: number;
+    image: File | null;
+}) => {
+     const token = localStorage.getItem("authToken");
+    const formData = new FormData();
+
+    formData.append("name", name);
+    formData.append("description", description);
+    formData.append("price", price);
+    formData.append("categoryId", String(categoryId));
+
+    if (discount !== "") {
+        formData.append("discount", String(discount));
+    }
+
+    if (image) {
+        formData.append("image", image);
+    }
+
+    const response = await fetch(`${MENU_BASE_URL}/products`, {
+        method: "POST",
+        headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}), // ← ahora sí dentro de headers
+        },
+        body: formData,
+       
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw data as ApiError;
+    }
+
+    return data;
+};
+
+export const updateProduct = async (
+    id: number,
+    {
+        name,
+        description,
+        price,
+        discount,
+        categoryId,
+        image,
+    }: {
+        name: string;
+        description: string;
+        price: string;
+        discount: number | "";
+        categoryId: number;
+        image: File | null;
+    },
+) => {
+
+const token = localStorage.getItem("authToken"); 
+
+    const formData = new FormData();
+
+    formData.append("name", name);
+    formData.append("description", description);
+    formData.append("price", price);
+    formData.append("categoryId", String(categoryId));
+
+    if (discount !== "") {
+        formData.append("discount", String(discount));
+    }
+
+    if (image) {
+        formData.append("image", image);
+    }
+
+    const response = await fetch(`${MENU_BASE_URL}/products/${id}`, {
+        method: "PUT",
+         headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}), // ← agregar
+        },
+        body: formData,
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw data as ApiError;
+    }
+
+    return data;
+};
+
+//crear producto personalizado 
+export const createCustomDish = async ({
+    name,
+    description,
+    price,
+    discount,
+    categoryId,
+    image,
+    optionGroups,
+}: {
+    name: string;
+    description: string;
+    price: string;
+    discount: number | "";
+    categoryId: number;
+    image: File | null;
+    optionGroups: { id: string; name: string; options: string[] }[];
+}) => {
+    const token = localStorage.getItem("authToken");
+
+    const formData = new FormData();
+
+    formData.append("name", name);
+    formData.append("description", description);
+    formData.append("price", price);
+    formData.append("categoryId", String(categoryId));
+
+    if (discount !== "") {
+        formData.append("discount", String(discount));
+    }
+
+    if (image) {
+        formData.append("image", image);
+    }
+
+    formData.append("optionGroups", JSON.stringify(optionGroups));
+
+    const response = await fetch(`${MENU_BASE_URL}/products/custom`, {
+        method: "POST",
+        headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: formData,
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw data as ApiError;
+    }
+
+    return data;
+};
+
+
+export const deleteProduct = async (id: number) => {
+    const token = localStorage.getItem("authToken");
+    const endpoints = [
+        `${MENU_BASE_URL}/products/${id}`,
+        `${MENU_BASE_URL}/products/custom/${id}`,
+    ];
+
+    let lastError: ApiError | unknown = { message: "No se pudo eliminar el platillo" };
+
+    for (const url of endpoints) {
+        try {
+            const response = await fetch(url, {
+                method: "DELETE",
+                headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}), // ← agregar
+    },
+            });
+
+            if (response.ok) {
+                return true;
+            }
+
+            const data = await response.json().catch(() => ({}));
+
+            if (response.status === 404 || response.status === 405) {
+                lastError = data as ApiError;
+                continue;
+            }
+
+            throw data as ApiError;
+        } catch (error) {
+            lastError = error as ApiError;
+        }
+    }
+
+    throw lastError as ApiError;
+};
+
+export const updateCustomDish = async (
+    id: number,
+    {
+        name,
+        description,
+        price,
+        discount,
+        categoryId,
+        image,
+        optionGroups,
+    }: {
+        name: string;
+        description: string;
+        price: string;
+        discount: number | "";
+        categoryId: number;
+        image: File | null;
+        optionGroups: { id: string; name: string; options: string[] }[];
+    },
+) => {
+    const token = localStorage.getItem("authToken");
+
+    const formData = new FormData();
+
+    formData.append("name", name);
+    formData.append("description", description);
+    formData.append("price", price);
+    formData.append("categoryId", String(categoryId));
+
+    if (discount !== "") {
+        formData.append("discount", String(discount));
+    }
+
+    if (image) {
+        formData.append("image", image);
+    }
+
+    formData.append("optionGroups", JSON.stringify(optionGroups));
+
+    const response = await fetch(`${MENU_BASE_URL}/products/custom/${id}`, {
+        method: "PUT",
+        headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: formData,
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw data as ApiError;
+    }
+
+    return data;
+};
